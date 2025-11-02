@@ -1,4 +1,10 @@
+import os
+
 import dspy
+import requests
+
+
+use_openai = False
 
 # Step 1
 
@@ -83,19 +89,13 @@ class RepositoryAnalyzer(dspy.Module):
 
 # Step 3
 
-import requests
-import os
-
-
-def get_github_file_tree(repo_url):
+def get_github_file_tree(repo_url: str, ref: str = "master"):
     """Get repository file structure from GitHub API."""
     # Extract owner/repo from URL
     parts = repo_url.rstrip('/').split('/')
     owner, repo = parts[-2], parts[-1]
 
-    api_url = f"https://api.github.com/repos/{owner}/{repo}/git/trees/master?recursive=1"
-    print(api_url)
-    print(os.environ.get('GITHUB_ACCESS_TOKEN'))
+    api_url = f"https://api.github.com/repos/{owner}/{repo}/git/trees/{ref}?recursive=1"
     response = requests.get(api_url, headers={
         "Authorization": f"Bearer {os.environ.get('GITHUB_ACCESS_TOKEN')}"
     })
@@ -114,7 +114,6 @@ def get_github_file_content(repo_url, file_path):
     owner, repo = parts[-2], parts[-1]
 
     api_url = f"https://api.github.com/repos/{owner}/{repo}/contents/{file_path}"
-    print(api_url)
     response = requests.get(api_url, headers={
         "Authorization": f"Bearer {os.environ.get('GITHUB_ACCESS_TOKEN')}"
     })
@@ -127,9 +126,9 @@ def get_github_file_content(repo_url, file_path):
         return f"Could not fetch {file_path}"
 
 
-def gather_repository_info(repo_url):
+def gather_repository_info(repo_url,  ref: str = "master"):
     """Gather all necessary repository information."""
-    file_tree = get_github_file_tree(repo_url)
+    file_tree = get_github_file_tree(repo_url, ref)
     readme_content = get_github_file_content(repo_url, "README.md")
 
     # Get key package files
@@ -148,21 +147,21 @@ def gather_repository_info(repo_url):
 
 # Step 4
 
-def generate_llms_txt_for_dspy(repo_url: str = "https://github.com/dnck/aliash"):
+def generate_llms_txt_for_dspy(repo_url: str = "https://github.com/dnck/aliash", ref: str = "master") -> dspy.Prediction:
     # Configure DSPy (use your preferred LM)
-
-    # lm = dspy.LM(model="gpt-4o-mini")
-    # dspy.configure(lm=lm)
-    # os.environ["OPENAI_API_KEY"] = "<YOUR OPENAI KEY>"
-
-    lm = dspy.LM('ollama_chat/gpt-oss', api_base='http://localhost:11434', api_key='')
-    dspy.configure(lm=lm)
+    if use_openai:
+        lm = dspy.LM(model="gpt-4o-mini")
+        dspy.configure(lm=lm)
+        os.environ["OPENAI_API_KEY"] = "<YOUR OPENAI KEY>"
+    else:
+        lm = dspy.LM('ollama_chat/gpt-oss', api_base='http://localhost:11434', api_key='')
+        dspy.configure(lm=lm)
 
     # Initialize our analyzer
     analyzer = RepositoryAnalyzer()
 
     # Gather DSPy repository information
-    file_tree, readme_content, package_files = gather_repository_info(repo_url)
+    file_tree, readme_content, package_files = gather_repository_info(repo_url, ref)
 
     # Generate llms.txt
     result = analyzer(
