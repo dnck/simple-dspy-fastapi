@@ -133,7 +133,7 @@ def gather_repository_info(repo_url,  ref: str = "master"):
 
     # Get key package files
     package_files = []
-    for file_path in ["pyproject.toml", "setup.py", "requirements.txt", "package.json", "go.mod", "go.sum"]:
+    for file_path in ["pyproject.toml", "setup.py", "requirements.txt", "package.json"]:
         try:
             content = get_github_file_content(repo_url, file_path)
             if "Could not fetch" not in content:
@@ -149,6 +149,10 @@ def gather_repository_info(repo_url,  ref: str = "master"):
 
 def generate_llms_txt_for_dspy(repo_url: str, ref: str = "master") -> dspy.Prediction:
     # Configure DSPy (use your preferred LM)
+    dspy.configure_cache(
+        enable_disk_cache=False,
+        enable_memory_cache=False,
+    )
     if use_openai:
         lm = dspy.LM(model="gpt-4o-mini")
         dspy.configure(lm=lm)
