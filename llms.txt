@@ -1,7 +1,192 @@
+# Project Purpose
+To illustrate how Go’s module checksum verification works and to demonstrate that tampering with a released tag (by force‑pushing a new commit over an existing tag) causes a security error when the module is fetched.
+
+# Key Concepts
+- Go modules
+- checksumdb
+- sum.golang.org
+- module versioning
+- tags
+- security verification
+- go.mod
+- go.sum
+- force push
+- module proxy
+
+# Architecture Overview
+The project is a single Go module with two packages: the root package (`main`) and a sub‑package (`pkg`).  
+The `main` package imports `pkg` and uses a function defined in `common.go`.  
+The module is defined in `go.mod` and its checksums are recorded in `go.sum`.  
+The README explains that the `v2.0.1` tag was force‑pushed to a different commit, so the checksum stored in the public checksum database no longer matches the code.  
+When a consumer runs `go get github.com/dnck/cool-tool-go/v2@v2.0.1`, the Go toolchain queries the checksum database, compares the expected checksum with the downloaded module, and fails with a security error.  
+This simple architecture is sufficient to demonstrate the checksum verification mechanism and the consequences of tampering with released tags.
+
+# Important Directories
+- `pkg`
+
+# Entry Points
+- `main.go`
+
+# Development Info
+This is a Go module project. The module path is defined in `go.mod`.  
+To build and run the application, use:
 ```
-# List of available LLM identifiers for dspy
-# Each line is a model name that can be used with DSPY_MODEL
-gpt-4o-mini
-llama3-8b
-gpt-3.5-turbo
+go build -o app
+./app
 ```
+or simply:
+```
+go run main.go
+```
+Dependencies are managed via Go modules, so running `go mod tidy` will fetch any required packages.  
+The `pkg/common.go` file contains shared utilities or types that are imported by `main.go`.  
+The project follows standard Go conventions and can be tested with `go test ./...` if test files are added.
+
+# Usage Examples
+**Prerequisites**
+
+- Go 1.20+ installed (`go version` should show a recent release).
+- Git installed and configured with a remote repository (e.g., GitHub, GitLab, or a local bare repo).
+- Access to the module proxy (default is `https://proxy.golang.org`).
+
+---
+
+### 1. Clone the repository and build the module
+
+```bash
+# Clone the repo (replace <repo-url> with the actual URL)
+git clone <repo-url>
+cd <repo-name>
+
+# Verify the module builds
+go build ./...
+```
+
+The module contains a simple `hello.go` that prints a message. The `go.mod` file declares the module path (e.g., `example.com/hello`).
+
+---
+
+### 2. Publish the first tag
+
+```bash
+# Tag the current commit
+git tag v1.0.0
+
+# Push the tag to the remote
+git push origin v1.0.0
+```
+
+After pushing, the module is available at `example.com/hello@v1.0.0`. The checksum database (`sum.golang.org`) records the SHA256 of the module’s source at this tag.
+
+---
+
+### 3. Create a second project that depends on the module
+
+```bash
+# Create a new directory for the consumer
+mkdir ../consumer
+cd ../consumer
+
+# Initialize a new Go module
+go mod init consumer
+
+# Add a dependency on the published module
+go get example.com/hello@v1.0.0
+
+# Verify that the dependency was fetched
+go list -m all
+```
+
+The `go.mod` of the consumer now contains:
+
+```
+require example.com/hello v1.0.0
+```
+
+and the `go.sum` file contains the checksum for `example.com/hello@v1.0.0`.
+
+---
+
+### 4. Force‑push a new commit over the existing tag (tampering)
+
+Return to the original repository:
+
+```bash
+cd ../<repo-name>
+
+# Make a small change (e.g., modify the printed message)
+sed -i 's/Hello/Hello, tampered/' hello.go
+
+# Commit the change
+git commit -am "Tamper with the message"
+
+# Force‑push the tag to overwrite the old commit
+git push --force origin v1.0.0
+```
+
+Now the tag `v1.0.0` points to a different commit, but the checksum database still holds the original checksum.
+
+---
+
+### 5. Attempt to fetch the module again from the consumer
+
+```bash
+cd ../consumer
+
+# Clean the module cache to force a fresh download
+go clean -modcache
+
+# Try to download the module again
+go get example.com/hello@v1.0.0
+```
+
+You should see an error similar to:
+
+```
+go: downloading example.com/hello v1.0.0
+go: verifying example.com/hello v1.0.0
+go: checksum mismatch for module example.com/hello v1.0.0:
+        expected: 3a5b... (from sum.golang.org)
+        actual:   7c2d... (from the repository)
+go: failed to download example.com/hello v1.0.0: checksum mismatch
+```
+
+This demonstrates that Go’s module system protects against tampering by rejecting any module whose source does not match the recorded checksum.
+
+---
+
+### 6. (Optional) Verify the checksum manually
+
+If you want to see the checksum that Go expects, you can query the checksum database:
+
+```bash
+go mod download -json example.com/hello@v1.0.0 | jq '.Sum'
+```
+
+The output will show the SHA256 that was originally recorded. After the force‑push, the actual checksum of the module will differ, causing the mismatch.
+
+---
+
+### 7. Clean up
+
+If you want to reset the repository to its original state:
+
+```bash
+# Delete the tampered tag
+git tag -d v1.0.0
+git push origin :refs/tags/v1.0.0
+
+# Re‑tag the original commit (replace <original-commit> with its hash)
+git tag v1.0.0 <original-commit>
+git push origin v1.0.0
+```
+
+---
+
+**Key Takeaways**
+
+- Tags should be immutable; force‑pushing over a tag breaks checksum verification.
+- The Go module proxy (`sum.golang.org`) stores checksums per module version.
+- When a module’s source changes but the tag remains the same, `go get` will fail with a checksum mismatch, protecting consumers from tampered code.
+
+Feel free to adapt these steps to your own repository or CI pipeline to test checksum verification in a controlled environment.

@@ -133,7 +133,7 @@ def gather_repository_info(repo_url,  ref: str = "master"):
 
     # Get key package files
     package_files = []
-    for file_path in ["pyproject.toml", "setup.py", "requirements.txt", "package.json"]:
+    for file_path in ["pyproject.toml", "setup.py", "requirements.txt", "package.json", "go.mod", "go.sum"]:
         try:
             content = get_github_file_content(repo_url, file_path)
             if "Could not fetch" not in content:
@@ -147,7 +147,7 @@ def gather_repository_info(repo_url,  ref: str = "master"):
 
 # Step 4
 
-def generate_llms_txt_for_dspy(repo_url: str = "https://github.com/dnck/aliash", ref: str = "master") -> dspy.Prediction:
+def generate_llms_txt_for_dspy(repo_url: str, ref: str = "master") -> dspy.Prediction:
     # Configure DSPy (use your preferred LM)
     if use_openai:
         lm = dspy.LM(model="gpt-4o-mini")
