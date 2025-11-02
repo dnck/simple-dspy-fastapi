@@ -16,7 +16,7 @@ app = FastAPI()
 
 @app.post("/generate_llms_txt", response_model=Response)
 def generate(req: Request):
-    content = run_dspy_pipeline(repo=req.repo)
+    content = run_dspy_pipeline(repo=req.repo, ref=req.ref)
     summ = "Summary generation not implemented."
     return Response(file_path="llms.txt", content=content, summary=summ)
 

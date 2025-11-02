@@ -174,8 +174,8 @@ def generate_llms_txt_for_dspy(repo_url: str = "https://github.com/dnck/aliash",
     return result
 
 
-def run_dspy_pipeline(repo: str) -> str:
-    result = generate_llms_txt_for_dspy(repo)
+def run_dspy_pipeline(repo: str, ref: str = "master") -> str:
+    result = generate_llms_txt_for_dspy(repo, ref)
 
     # Save the generated llms.txt
     with open("llms.txt", "w") as f:
